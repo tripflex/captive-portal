@@ -1,0 +1,35 @@
+author: Myles McNamara <myles@smyl.es>
+type: lib
+description: DNS responder and HTTP file serve handling for Captive Portals
+version: 1.0.0
+# platforms: [ cc3200, cc3220, esp32, esp8266 ]
+
+sources:
+  - src
+
+filesystem:
+  - fs
+
+includes:
+  - include
+
+config_schema:
+  - [ "cportal", "o", {title: "Captive Portal configurations"}]
+  - [ "cportal.enable", "b", true, {title: "Enable WiFi captive portal on device boot"}]
+  - [ "cportal.hostname", "s", "setup.device.local", {title: "Hostname to use for captive portal redirect"}]
+  - [ "cportal.index", "s", "index.html", {title: "Filename of HTML file to use when serving the captive portal index file"}]
+
+libs:
+  - origin: https://github.com/mongoose-os-libs/boards
+  - origin: https://github.com/mongoose-os-libs/ca-bundle
+  - origin: https://github.com/mongoose-os-libs/http-server
+
+tags:
+  - c
+  - portal
+
+cdefs:
+  MG_ENABLE_DNS: 1
+  MG_ENABLE_DNS_SERVER: 1
+
+manifest_version: 2017-09-29
