@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018 Myles McNamara
+ * Copyright (c) 2019 Myles McNamara
  * All rights reserved
  *
  * Licensed under the Apache License, Version 2.0 (the ""License"");
@@ -34,8 +34,62 @@ static const char *s_listening_addr = "udp://:53";
 static const char *s_portal_index_file = "index.html";
 
 static int s_captive_portal_init = 0;
+static int s_portal_index_is_gz = 0;
 
 static struct mg_serve_http_opts s_http_server_opts;
+
+static void http_msg_print(const struct http_message *msg){
+    LOG(LL_INFO, ("\n\n   MESSAGE: \n \"%.*s\"\n\n", msg->message.len, msg->message.p));
+    LOG(LL_INFO, ("      method: \"%.*s\"", msg->method.len, msg->method.p));
+    LOG(LL_INFO, ("         uri: \"%.*s\"", msg->uri.len, msg->uri.p));
+}
+
+static bool x_requested_with_android( struct http_message *msg ){
+    
+    struct mg_str *hdrval = mg_get_http_header(msg, "X-Requested-With");
+
+    if (hdrval != NULL && strstr(hdrval->p, "com.android.captiveportallogin") != NULL ){
+        return true;
+    }
+
+    return false;
+}
+
+static bool accept_gzip_encoding( struct http_message *msg ){
+    
+    struct mg_str *hdrval = mg_get_http_header(msg, "Accept-Encoding");
+
+    if (hdrval != NULL && strstr(hdrval->p, "gzip") != NULL ){
+        return true;
+    }
+
+    return false;
+}
+
+static bool user_agent_captivenetworksupport( struct http_message *msg ){
+    
+    struct mg_str *hdrval = mg_get_http_header(msg, "User-Agent");
+
+    if (hdrval != NULL && strstr(hdrval->p, "CaptiveNetworkSupport") != NULL ){
+        return true;
+    }
+
+    return false;
+}
+
+static bool gzip_file_requested(struct http_message *msg){
+    struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
+    return strncmp(uri.p + uri.len - 3, ".gz", 3) == 0;
+}
+
+static int ends_in_gz( char *string ){
+  string = strrchr(string, '.');
+
+  if( string != NULL )
+    return( strcmp(string, ".gz") );
+
+  return( -1 );
+}
 
 char *get_redirect_url(void){
     static char redirect_url[256];
@@ -69,38 +123,44 @@ static void send_redirect_html_generated2(struct mg_connection *nc, int status_c
 static void send_redirect_html_generated(struct mg_connection *nc, int status_code, const struct mg_str location ) {
   char bbody[100], *pbody = bbody;
   int bl = mg_asprintf(&pbody, sizeof(bbody),
-                       "<head><meta http-equiv='refresh' content='0; url=%.*s'></head><body><p>Click <a href='%.*s'>here</a> to login.</p></body>\r\n",
+                       "<html><head><title>Redirecting to Captive Portal</title><meta http-equiv='refresh' content='0; url=%.*s'></head><body><p>Click <a href='%.*s'>here</a> to login.</p></body></html>\r\n",
                        (int) location.len, location.p, (int) location.len, location.p );
   mg_send_head(nc, status_code, bl, "Cache-Control: no-cache" );
   mg_send(nc, pbody, bl);
   if (pbody != bbody) free(pbody);
 }
 
-static void redirect_ev_handler(struct mg_connection *nc, int ev, void *ev_data, void *user_data){
+static void redirect_ev_handler(struct mg_connection *nc, int ev, void *p, void *user_data){
 
     if (ev != MG_EV_HTTP_REQUEST)
         return;
 
     char *redirect_url = get_redirect_url();
+    LOG(LL_INFO, (" --====== Redirecting to %s for Captive Portal  ======--", redirect_url ) );
 
-    LOG(LL_INFO, ("Redirecting to %s for Captive Portal", redirect_url ) );
+    struct http_message *msg = (struct http_message *)(p);
+    http_msg_print(msg);
+    
     mg_http_send_redirect(nc, 302, mg_mk_str(redirect_url), mg_mk_str(NULL));
 
-    (void)ev_data;
+    // (void)p;
     (void)user_data;
 }
 
-static void serve_redirect_ev_handler(struct mg_connection *nc, int ev, void *ev_data, void *user_data){
+static void serve_redirect_ev_handler(struct mg_connection *nc, int ev, void *p, void *user_data){
 
     if (ev != MG_EV_HTTP_REQUEST)
         return;
 
     char *redirect_url = get_redirect_url();
+    LOG(LL_INFO, (" --====== Serving Redirect HTML to %s for Captive Portal ======--", redirect_url ) );
 
-    LOG(LL_INFO, ("Serving Redirect HTML to %s for Captive Portal", redirect_url ) );
+    struct http_message *msg = (struct http_message *)(p);
+    http_msg_print(msg);
+
     send_redirect_html_generated( nc, 200, mg_mk_str(redirect_url) );
 
-    (void)ev_data;
+    // (void)p;
     (void)user_data;
 }
 
@@ -133,10 +193,17 @@ static void dns_ev_handler(struct mg_connection *c, int ev, void *ev_data,
     (void)user_data;
 }
 
-static void http_msg_print(const struct http_message *msg){
-    // LOG(LL_INFO, ("     message: \"%.*s\"\n", msg->message.len, msg->message.p));
-    LOG(LL_DEBUG, ("      method: \"%.*s\"", msg->method.len, msg->method.p));
-    LOG(LL_DEBUG, ("         uri: \"%.*s\"", msg->uri.len, msg->uri.p));
+static void serve_captive_portal(struct mg_connection *nc, struct http_message *msg){
+    LOG(LL_INFO, ("\nRoot Handler -- Captive Portal Root Requested\n"));
+
+    if( gzip_file_requested(msg) && s_portal_index_is_gz && accept_gzip_encoding(msg) ){
+        LOG(LL_INFO, ("Root Handler -- Captive Portal Serving GZIP HTML \n"));
+        mg_http_serve_file(nc, msg, s_portal_index_file, mg_mk_str("text/html"), mg_mk_str("Content-Encoding: gzip"));
+        return;
+    }
+    
+    LOG(LL_INFO, ("Root Handler -- Captive Portal Serving HTML \n"));
+    mg_http_serve_file(nc, msg, s_portal_index_file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *"));
 }
 
 static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_data){
@@ -153,49 +220,55 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
 
     // Check Host header for our hostname (to serve captive portal)
     struct mg_str *hhdr = mg_get_http_header(msg, "Host");
+    struct mg_str *aehdr = mg_get_http_header(msg, "Accept-Encoding");
+
+    if( aehdr != NULL ){
+        LOG(LL_INFO, ("Root Handler -- Found Accept-Encoding: %s \n", aehdr->p));
+    }
 
     if (hhdr != NULL && strstr(hhdr->p, s_portal_hostname) != NULL){
+
         // TODO: check Accept-Encoding header for gzip before serving gzip
         LOG(LL_INFO, ("Root Handler -- Host matches Captive Portal Host \n"));
-        // Check if gzip file was requested
+
         struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
-        bool gzip = strncmp(uri.p + uri.len - 3, ".gz", 3) == 0;
-        // Check if URI is root directory --  /wifi_portal.min.js.gz HTTP/1.1
+
+        // Check if URI is root directory
         bool uriroot = strncmp(uri.p, "/ HTTP", 6) == 0;
 
         // If gzip file requested -- set Content-Encoding
-        if (gzip){
+        if (gzip_file_requested(msg) && accept_gzip_encoding(msg)){
             LOG(LL_INFO, ("Root Handler -- gzip Asset Requested -- Adding Content-Encoding Header \n"));
             opts.extra_headers = "Content-Encoding: gzip";
         }
 
+        opts.index_files = s_portal_index_file;
+
         if (uriroot){
-            LOG(LL_INFO, ("\nRoot Handler -- Captive Portal Root Requested\n"));
-
-            opts.index_files = s_portal_index_file;
-
-            if( gzip ){
-                LOG(LL_INFO, ("Root Handler -- Captive Portal Serving GZIP HTML \n"));
-                mg_http_serve_file(nc, msg, s_portal_index_file, mg_mk_str("text/html"), mg_mk_str("Content-Encoding: gzip"));
-                return;
-            } else {
-                LOG(LL_INFO, ("Root Handler -- Captive Portal Serving HTML \n"));
-                mg_http_serve_file(nc, msg, s_portal_index_file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *"));
-                return;
-            }
-
+            serve_captive_portal(nc, msg);
+            return;
         } else {
             LOG(LL_DEBUG, ("\n Not URI Root, Actual: %s - %d\n", uri.p, uriroot));
         }
 
     } else {
+        
+        if( hhdr != NULL ){
+            LOG(LL_INFO, ("Root Handler -- HostName Not Match Portal - Actual: %s ", hhdr->p ));
+        }
+
+        if ( mgos_sys_config_get_cportal_any() ){
+            serve_captive_portal(nc, msg);
+            return;
+        }
 
         LOG(LL_INFO, ("Root Handler -- Checking for CaptivePortal UserAgent"));
 
         // Check User-Agent string for "CaptiveNetworkSupport" to issue redirect (AFTER checking for Captive Portal Host)
         struct mg_str *uahdr = mg_get_http_header(msg, "User-Agent");
+
         if (uahdr != NULL){
-            // LOG(LL_INFO, ("Root Handler -- Found USER AGENT: %s \n", uahdr->p));
+            LOG(LL_INFO, ("Root Handler -- Found USER AGENT: %s \n", uahdr->p));
 
             if (strstr(uahdr->p, "CaptiveNetworkSupport") != NULL){
                 LOG(LL_INFO, ("Root Handler -- Found USER AGENT CaptiveNetworkSupport -- Sending Redirect!\n"));
@@ -204,6 +277,8 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
             }
         }
     }
+
+    LOG(LL_INFO, (" --===== Root Handler -- SERVING DEFAULT MSG NO MATCHES =====--- "));
 
     // Serve non-root requested file
     mg_serve_http(nc, msg, opts);
@@ -235,6 +310,7 @@ bool mgos_captive_portal_start(void){
     // Set Hostname used for serving DNS captive portal
     s_portal_hostname = mgos_sys_config_get_cportal_hostname();
     s_portal_index_file = mgos_sys_config_get_cportal_index();
+    s_portal_index_is_gz = ends_in_gz( (char *) s_portal_index_file );
 
     // Bind DNS for Captive Portal
     struct mg_connection *dns_c = mg_bind(mgos_get_mgr(), s_listening_addr, dns_ev_handler, 0);
@@ -255,10 +331,12 @@ bool mgos_captive_portal_start(void){
     s_http_server_opts.custom_mime_types = ".html.gz=text/html; charset=utf-8,.js.gz=application/javascript; charset=utf-8,.css.gz=text/css; charset=utf-8";
     // CORS
     s_http_server_opts.extra_headers = "Access-Control-Allow-Origin: *";
+    
+    s_http_server_opts.index_files = s_portal_index_file;
 
     /**
      * Root handler to check for User-Agent captive portal support, check for our redirect hostname to serve portal HTML file,
-     * and to serve CSS and JS assets to client (after matching hostname in Host header)
+     * after matching hostname in Host header
      */
     mgos_register_http_endpoint("/", root_handler, NULL);
 
@@ -273,7 +351,10 @@ bool mgos_captive_portal_start(void){
     mgos_register_http_endpoint("/hotspot-detect.html", redirect_ev_handler, NULL);       // iOS 8/9
     mgos_register_http_endpoint("/hotspotdetect.html", redirect_ev_handler, NULL);       // iOS 8/9
     mgos_register_http_endpoint("/library/test/success.html", redirect_ev_handler, NULL); // iOS 8/9
-    mgos_register_http_endpoint("/kindle-wifi/wifistub.html", redirect_ev_handler, NULL); // iOS 8/9
+    // Kindle when requested with com.android.captiveportallogin
+    mgos_register_http_endpoint("/kindle-wifi/wifiredirect.html", redirect_ev_handler, NULL);
+    // Kindle before requesting with captive portal login window (maybe for detection?)
+    // mgos_register_http_endpoint("/kindle-wifi/wifistub.html", serve_redirect_ev_handler, NULL);
 
     s_captive_portal_init = true;
 
