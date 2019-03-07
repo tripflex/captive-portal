@@ -11,6 +11,7 @@
       - [`cportal.hostname` Setting](#cportalhostname-setting)
       - [`cportal.redirect_file` Setting](#cportalredirect_file-setting)
   - [Installation/Usage](#installationusage)
+    - [Use specific branch of library](#use-specific-branch-of-library)
   - [Required Libraries](#required-libraries)
   - [How it works](#how-it-works)
       - [Known Endpoints](#known-endpoints)
@@ -18,7 +19,6 @@
       - [Android `/generate_204` Handling](#android-generate_204-handling)
   - [Available Functions/Methods](#available-functionsmethods)
     - [C Functions](#c-functions)
-  - [Use specific branch of library](#use-specific-branch-of-library)
   - [Changelog](#changelog)
   - [License](#license)
 
@@ -84,6 +84,14 @@ Add this lib your `mos.yml` file under `libs:`
   - origin: https://github.com/tripflex/captive-portal
 ```
 
+### Use specific branch of library
+To use a specific branch of this library (as example, `dev`), you need to specify the `version` below the library
+
+```yaml
+  - origin: https://github.com/tripflex/captive-portal
+   version: dev
+```
+
 ## Required Libraries
 *These libraries are already defined as dependencies of this library, and is just here for reference (you're probably already using these anyways)*
 - [boards](https://github.com/mongoose-os-libs/boards)
@@ -130,14 +138,6 @@ The reason I did not want to use the above approach was because this would resul
 ### C Functions
 ```C
 bool mgos_captive_portal_start(void)
-```
-
-## Use specific branch of library
-To use a specific branch of this library (as example, `dev`), you need to specify the `version` below the library
-
-```yaml
-  - origin: https://github.com/tripflex/captive-portal
-   version: dev
 ```
 
 ## Changelog

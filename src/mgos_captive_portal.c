@@ -98,6 +98,18 @@ char *get_redirect_url(void){
     return redirect_url;
 }
 
+static void serve_captive_portal_file(const char *file, struct mg_connection *nc, struct http_message *msg){
+
+    if( ends_in_gz( file ) && accept_gzip_encoding(msg) ){
+        LOG(LL_INFO, ("-- Captive Portal Serving GZIP HTML file %s \n", file ));
+        mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Content-Encoding: gzip"));
+        return;
+    }
+    
+    LOG(LL_INFO, ("-- Captive Portal Serving HTML file %s \n", file ));
+    mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *"));
+}
+
 static void send_redirect_html_generated2(struct mg_connection *nc, int status_code,
                            const struct mg_str location,
                            const struct mg_str extra_headers) {
@@ -195,18 +207,6 @@ static void dns_ev_handler(struct mg_connection *c, int ev, void *ev_data,
     mg_dns_send_reply(c, &reply);
     mbuf_free(&reply_buf);
     (void)user_data;
-}
-
-static void serve_captive_portal_file(const char *file, struct mg_connection *nc, struct http_message *msg){
-
-    if( ends_in_gz( file ) && accept_gzip_encoding(msg) ){
-        LOG(LL_INFO, ("-- Captive Portal Serving GZIP HTML file %s \n", file ));
-        mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Content-Encoding: gzip"));
-        return;
-    }
-    
-    LOG(LL_INFO, ("-- Captive Portal Serving HTML file %s \n", file ));
-    mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *"));
 }
 
 static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_data){
@@ -342,7 +342,7 @@ bool mgos_captive_portal_start(void){
     mgos_register_http_endpoint("/ncsi.txt", redirect_ev_handler, NULL);                  // Windows
     mgos_register_http_endpoint("/success.txt", redirect_ev_handler, NULL);       // OSX
     mgos_register_http_endpoint("/hotspot-detect.html", redirect_ev_handler, NULL);       // iOS 8/9
-    mgos_register_http_endpoint("/hotspotdetect.html", serve_redirect_ev_handler, NULL);       // iOS 8/9
+    mgos_register_http_endpoint("/hotspotdetect.html", redirect_ev_handler, NULL);       // iOS 8/9
     mgos_register_http_endpoint("/library/test/success.html", redirect_ev_handler, NULL); // iOS 8/9
     // Kindle when requested with com.android.captiveportallogin
     mgos_register_http_endpoint("/kindle-wifi/wifiredirect.html", serve_redirect_ev_handler, NULL);
