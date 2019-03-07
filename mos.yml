@@ -17,8 +17,9 @@ config_schema:
   - [ "cportal", "o", {title: "Captive Portal configurations"}]
   - [ "cportal.any", "b", false, {title: "Return index file for any non-hostname matching requests"}]
   - [ "cportal.enable", "b", false, {title: "Enable WiFi captive portal on device boot"}]
-  - [ "cportal.hostname", "s", "setup.device.local", {title: "Hostname to use for captive portal redirect"}]
+  - [ "cportal.hostname", "s", "setup.device.portal", {title: "Hostname to use for captive portal redirect"}]
   - [ "cportal.index", "s", "index.html", {title: "Filename of HTML file to use when serving the captive portal index file"}]
+  - [ "cportal.redirect_file", "s", "", {title: "(optional) filename of HTML file to use for redirect to captive portal page (must include a meta refresh tag to do redirection)"}]
 
 libs:
   - origin: https://github.com/mongoose-os-libs/boards
@@ -28,6 +29,10 @@ libs:
 tags:
   - c
   - portal
+
+init_after:
+  - wifi
+  - http-server
 
 cdefs:
   MG_ENABLE_DNS: 1
