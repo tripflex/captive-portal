@@ -8,15 +8,18 @@
   - [Why?](#why)
   - [Features](#features)
   - [Settings](#settings)
+      - [`cportal.hostname` Setting](#cportalhostname-setting)
+      - [`cportal.redirect_file` Setting](#cportalredirect_file-setting)
   - [Installation/Usage](#installationusage)
+    - [Use specific branch of library](#use-specific-branch-of-library)
   - [Required Libraries](#required-libraries)
   - [How it works](#how-it-works)
+  - [Tested Devices](#tested-devices)
       - [Known Endpoints](#known-endpoints)
       - [Samsung Device Caveots](#samsung-device-caveots)
       - [Android `/generate_204` Handling](#android-generate_204-handling)
   - [Available Functions/Methods](#available-functionsmethods)
     - [C Functions](#c-functions)
-  - [Use specific branch of library](#use-specific-branch-of-library)
   - [Changelog](#changelog)
   - [License](#license)
 
@@ -35,23 +38,59 @@ You may be wondering why did I create my own, when Mongoose OS has a Captive Por
 ## Features
 - Mobile and desktop devices prompt the "Login to network" window/notification
 - Support for GZIP files
+- Checks device Accepts header to make sure that it supports GZIP before sending/using GZIP files
 - Support for Samsung Android devices that do not follow Captive Portal 302 redirect standards
 
 ## Settings
 Check the `mos.yml` file for latest settings, all settings listed below are defaults
 
 ```yaml
-  - [ "cportal", "o", {title: "Captive Portal configurations"}]
-  - [ "cportal.enable", "b", true, {title: "Enable WiFi captive portal on device boot"}]
-  - [ "cportal.hostname", "s", "setup.device.local", {title: "Hostname to use for captive portal redirect"}]
+  - [ "cportal.enable", "b", false, {title: "Enable WiFi captive portal on device boot"}]
+  - [ "cportal.hostname", "s", "setup.device.portal", {title: "Hostname to use for captive portal redirect"}]
   - [ "cportal.index", "s", "index.html", {title: "Filename of HTML file to use when serving the captive portal index file"}]
+  - [ "cportal.redirect_file", "s", "", {title: "(optional) filename of HTML file to use for redirect to captive portal page (must include a meta refresh tag to do redirection)"}]
 ```
+
+#### `cportal.hostname` Setting
+By default this is set to `setup.device.portal` but you can change it to anything you want.  In my testing though, when testing with a `.local` domain, for some weird reason OSX (Mojave and El Captain) did not query the device for DNS to `.local` and would result in a "Could not connect" error.  This is why I have set the default as `.portal`, but you could use anything `setup.device.com`, etc, etc.
+
+#### `cportal.redirect_file` Setting
+This setting if for if you want to use your own custom HTML file as the "redirect" file sent that includes a `meta` refresh tag.  This setting is optional, and when not defined, a dynamically generated response will be sent, that looks similar to this:
+
+```HTML
+<html>
+   <head>
+      <title>Redirecting to Captive Portal</title>
+      <meta http-equiv='refresh' content='0; url=PORTAL_URL'>
+   </head>
+   <body>
+      <p>Please wait, refreshing.  If page does not refresh, click <a href='PORTAL_URL'>here</a> to login.</p>
+   </body>
+</html>
+```
+
+The `PORTAL_URL` is dynamically replaced with the value set in `cportal.hostname`.  If you use your own custom redirect HTML file, you will need to manually define the portal redirect URL in that file yourself.
+
+**NOTE:** The important part of HTML above is the meta refresh tag:
+```HTML
+<meta http-equiv='refresh' content='0; url=PORTAL_URL'>
+```
+
+Make sure you include this if you use your own custom HTML redirect file, and make sure to replace `PORTAL_URL` with your captive portal hostname or URL you want to redirect the user to.  The value of `0` is how many seconds it waits before refreshing, with this set to `0` it does an immediate refresh.
 
 ## Installation/Usage
 Add this lib your `mos.yml` file under `libs:`
 
 ```yaml
   - origin: https://github.com/tripflex/captive-portal
+```
+
+### Use specific branch of library
+To use a specific branch of this library (as example, `dev`), you need to specify the `version` below the library
+
+```yaml
+  - origin: https://github.com/tripflex/captive-portal
+   version: dev
 ```
 
 ## Required Libraries
@@ -63,21 +102,32 @@ Add this lib your `mos.yml` file under `libs:`
 ## How it works
 When device boots up, if `cportal.enable` is set to `true` (default is `false`) captive portal is initialized. If `cportal.enable` is not set to `true` you must call `mgos_captive_portal_start` in C (mJS to be added later)
 
+## Tested Devices
+These are the devices, and software versions this library has been tested with to confirm compatibilty/functionality.
+- **LG-D415** Android `4.4.4` (MIUI 7)
+- **Amazon Fire HD 8 Tablet** (Fire OS `5.3.6.4`)
+- **Pixel 3XL** (Android 9)
+- **Pixel 2** (Android 9)
+- **Pixel 1** (Android 9)
+- **2018 Macbook Pro** (OSX Mojave `10.14.3`)
+
+**Have you tested this library with a different device not listed here?** -- If so, **PLEASE** open a new issue, and let us know what model phone/device, and the software version so it can be added to this list!
+
 #### Known Endpoints
 Initialization enables a DNS responder for any `A` DNS record, that responds with the device's IP address.  Captive Portal also adds numerous HTTP endpoints for known Captive Portal device endpoints:
 - `/mobile/status.php` Android 8.0 (Samsung s9+)
 - `/generate_204` Android
 - `/gen_204` Android
 - `/ncsi.txt` Windows
-- `/hotspot-detect.html` iOS
-- `/hotspotdetect.html` iOS
+- `/hotspot-detect.html` iOS/OSX
+- `/hotspotdetect.html` iOS/OSX
 - `/library/test/success.html` iOS
 - `/success.txt` OSX
-- `/kindle-wifi/wifistub.html` Kindle
+- `/kindle-wifi/wifiredirect.html` Kindle (serves index file for this request to prevent "Insecure Redirect" warning)
 
 A root endpoint is also added, `/` to detect `CaptiveNetworkSupport` in the User-Agent of device, to redirect to captive portal.
 
-When one of these endpoints is detected from a device (mobile/desktop), it will automatically redirect (with a `302` redirect), to the config value from `cportal.hostname` (default is `setup.device.local`).
+When one of these endpoints is detected from a device (mobile/desktop), it will automatically redirect (with a `302` redirect), to the config value from `cportal.hostname` (default is `setup.device.portal`).
 
 If on a mobile device, the user should be prompted to "Login to Wifi Network", or on desktop with captive portal support, it should open a window.
 
@@ -100,14 +150,6 @@ The reason I did not want to use the above approach was because this would resul
 ### C Functions
 ```C
 bool mgos_captive_portal_start(void)
-```
-
-## Use specific branch of library
-To use a specific branch of this library (as example, `dev`), you need to specify the `version` below the library
-
-```yaml
-  - origin: https://github.com/tripflex/captive-portal
-   version: dev
 ```
 
 ## Changelog
