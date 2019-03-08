@@ -82,13 +82,13 @@ static bool gzip_file_requested(struct http_message *msg){
     return strncmp(uri.p + uri.len - 3, ".gz", 3) == 0;
 }
 
-static int ends_in_gz( const char *string ){
-  string = strrchr(string, '.');
+static bool ends_in_gz( const char *string ){
 
-  if( string != NULL )
-    return( strcmp(string, ".gz") );
+    if(strlen(string) > 3 && !strcmp(string + strlen(string) - 3, ".gz")){
+        return true;
+    }
 
-  return( -1 );
+    return false;
 }
 
 char *get_redirect_url(void){
@@ -254,12 +254,6 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
         if( hhdr != NULL ){
             LOG(LL_INFO, ("Root Handler -- HostName Not Match Portal - Actual: %s ", hhdr->p ));
         }
-        
-        // Serve captive portal index file for any non captive portal hostname requests
-        if ( mgos_sys_config_get_cportal_any() ){
-            serve_captive_portal_file( s_portal_index_file, nc, msg );
-            return;
-        }
 
         LOG(LL_INFO, ("Root Handler -- Checking for CaptivePortal UserAgent"));
 
@@ -267,6 +261,12 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
         if( user_agent_captivenetworksupport(msg) ){
             LOG(LL_INFO, ("Root Handler -- Found USER AGENT CaptiveNetworkSupport -- Sending Redirect!\n"));
             redirect_ev_handler(nc, ev, p, user_data);
+            return;
+        }
+
+        // Serve captive portal index file for any non captive portal hostname requests
+        if ( mgos_sys_config_get_cportal_any() ){
+            serve_captive_portal_file( s_portal_index_file, nc, msg );
             return;
         }
     }
