@@ -18,7 +18,6 @@
 #include <string.h>
 
 #include "mgos_utils.h"
-#include "mgos_timers.h"
 #include "mgos_config.h"
 #include "mgos_mongoose.h"
 #include "mgos_captive_portal.h"
@@ -69,6 +68,8 @@ static bool accept_gzip_encoding( struct http_message *msg ){
 static bool user_agent_captivenetworksupport( struct http_message *msg ){
     
     struct mg_str *hdrval = mg_get_http_header(msg, "User-Agent");
+    
+    LOG(LL_INFO, ("Captive Portal -- Checking for CaptivePortal UserAgent"));
 
     if (hdrval != NULL && strstr(hdrval->p, "CaptiveNetworkSupport") != NULL ){
         return true;
@@ -80,6 +81,15 @@ static bool user_agent_captivenetworksupport( struct http_message *msg ){
 static bool gzip_file_requested(struct http_message *msg){
     struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
     return strncmp(uri.p + uri.len - 3, ".gz", 3) == 0;
+}
+
+static bool is_captive_portal_hostname(struct http_message *msg){
+    struct mg_str *hhdr = mg_get_http_header(msg, "Host");
+    bool matches = hhdr != NULL && strstr(hhdr->p, s_portal_hostname) != NULL;
+    if( ! matches ){
+        LOG(LL_INFO, ("Root Handler -- HostName Not Match Portal - Actual: %s ", hhdr->p ));
+    }
+    return matches;
 }
 
 static bool ends_in_gz( const char *string ){
@@ -102,12 +112,23 @@ static void serve_captive_portal_file(const char *file, struct mg_connection *nc
 
     if( ends_in_gz( file ) && accept_gzip_encoding(msg) ){
         LOG(LL_INFO, ("-- Captive Portal Serving GZIP HTML file %s \n", file ));
-        mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Content-Encoding: gzip"));
+        mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *\r\nContent-Encoding: gzip"));
         return;
     }
     
     LOG(LL_INFO, ("-- Captive Portal Serving HTML file %s \n", file ));
     mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *"));
+}
+
+static void serve_captive_portal_index_file(struct mg_connection *nc, int ev, void *p, void *user_data){
+    if (ev != MG_EV_HTTP_REQUEST)
+        return;
+
+    struct http_message *msg = (struct http_message *)(p);
+    serve_captive_portal_file( s_portal_index_file, nc, msg );
+
+    (void)ev;
+    (void)user_data;
 }
 
 static void send_redirect_html_generated2(struct mg_connection *nc, int status_code,
@@ -221,23 +242,16 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
     struct mg_serve_http_opts opts;
     memcpy(&opts, &s_http_server_opts, sizeof(opts));
 
-    // Check Host header for our hostname (to serve captive portal)
-    struct mg_str *hhdr = mg_get_http_header(msg, "Host");
-
-    if (hhdr != NULL && strstr(hhdr->p, s_portal_hostname) != NULL){
-
-        // TODO: check Accept-Encoding header for gzip before serving gzip
+    if ( is_captive_portal_hostname(msg) ){
         LOG(LL_INFO, ("Root Handler -- Host matches Captive Portal Host \n"));
-
         struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
-
         // Check if URI is root directory
         bool uriroot = strncmp(uri.p, "/ HTTP", 6) == 0;
 
         // If gzip file requested -- set Content-Encoding
         if (gzip_file_requested(msg) && accept_gzip_encoding(msg)){
             LOG(LL_INFO, ("Root Handler -- gzip Asset Requested -- Adding Content-Encoding Header \n"));
-            opts.extra_headers = "Content-Encoding: gzip";
+            opts.extra_headers = "Access-Control-Allow-Origin: *\r\nContent-Encoding: gzip";
         }
 
         opts.index_files = s_portal_index_file;
@@ -246,16 +260,10 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
             serve_captive_portal_file( s_portal_index_file, nc, msg);
             return;
         } else {
-            LOG(LL_DEBUG, ("\n Not URI Root, Actual: %s - %d\n", uri.p, uriroot));
+            LOG(LL_DEBUG, ("\n Captive Portal Host BUT NOT URI Root - Actual: %s - %d\n", uri.p, uriroot));
         }
 
     } else {
-        
-        if( hhdr != NULL ){
-            LOG(LL_INFO, ("Root Handler -- HostName Not Match Portal - Actual: %s ", hhdr->p ));
-        }
-
-        LOG(LL_INFO, ("Root Handler -- Checking for CaptivePortal UserAgent"));
 
         // Check for CaptivePortal useragent and send redirect if found
         if( user_agent_captivenetworksupport(msg) ){
@@ -264,15 +272,16 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
             return;
         }
 
-        // Serve captive portal index file for any non captive portal hostname requests
+        // Requested hostname does not match captive portal hostname, and user agent did not match either
+        // If serve any enabled, serve portal index file regardless of requested hostname
         if ( mgos_sys_config_get_cportal_any() ){
+            LOG(LL_INFO, ("Captive Portal -- NOT Host -- Serve Any Enabled -- Serving Portal Index File!\n"));
             serve_captive_portal_file( s_portal_index_file, nc, msg );
             return;
         }
     }
 
-    LOG(LL_INFO, (" --===== Root Handler -- SERVING DEFAULT MSG NO MATCHES =====--- "));
-
+    LOG(LL_INFO, (" --===== Root Handler -- SERVING DEFAULT NO MATCHES =====--- "));
     // Serve non-root requested file
     mg_serve_http(nc, msg, opts);
 }
@@ -286,10 +295,10 @@ bool mgos_captive_portal_start(void){
 
     LOG(LL_INFO, ("Starting Captive Portal..."));
 
-#if CS_PLATFORM == CS_P_ESP8266
+    #if CS_PLATFORM == CS_P_ESP8266
     int on = 1;
     wifi_softap_set_dhcps_offer_option(OFFER_ROUTER, &on);
-#endif
+    #endif
     /*
      *    TODO:
      *    Maybe need to figure out way to handle DNS for captive portal, if user has defined AP hostname,
@@ -327,10 +336,6 @@ bool mgos_captive_portal_start(void){
     
     // s_http_server_opts.index_files = s_portal_index_file;
 
-    /**
-     * Root handler to check for User-Agent captive portal support, check for our redirect hostname to serve portal HTML file,
-     * after matching hostname in Host header
-     */
     mgos_register_http_endpoint("/", root_handler, NULL);
 
     // captive.apple.com - DNS request for Mac OSX
@@ -345,7 +350,8 @@ bool mgos_captive_portal_start(void){
     mgos_register_http_endpoint("/hotspotdetect.html", redirect_ev_handler, NULL);       // iOS 8/9
     mgos_register_http_endpoint("/library/test/success.html", redirect_ev_handler, NULL); // iOS 8/9
     // Kindle when requested with com.android.captiveportallogin
-    mgos_register_http_endpoint("/kindle-wifi/wifiredirect.html", serve_redirect_ev_handler, NULL);
+    // To prevent warning saying "Insecure Connection" from redirect, we instead just immediately serve the captive portal file
+    mgos_register_http_endpoint("/kindle-wifi/wifiredirect.html", serve_captive_portal_index_file, NULL);
     // Kindle before requesting with captive portal login window (maybe for detection?)
     // mgos_register_http_endpoint("/kindle-wifi/wifistub.html", serve_redirect_ev_handler, NULL);
 
@@ -355,11 +361,8 @@ bool mgos_captive_portal_start(void){
 }
 
 bool mgos_captive_portal_init(void){
-
-    // Check if config is set to enable captive portal on boot
     if (mgos_sys_config_get_cportal_enable()){
         mgos_captive_portal_start();
     }
-
     return true;
 }

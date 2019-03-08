@@ -14,6 +14,7 @@
     - [Use specific branch of library](#use-specific-branch-of-library)
   - [Required Libraries](#required-libraries)
   - [How it works](#how-it-works)
+  - [Tested Devices](#tested-devices)
       - [Known Endpoints](#known-endpoints)
       - [Samsung Device Caveots](#samsung-device-caveots)
       - [Android `/generate_204` Handling](#android-generate_204-handling)
@@ -101,6 +102,17 @@ To use a specific branch of this library (as example, `dev`), you need to specif
 ## How it works
 When device boots up, if `cportal.enable` is set to `true` (default is `false`) captive portal is initialized. If `cportal.enable` is not set to `true` you must call `mgos_captive_portal_start` in C (mJS to be added later)
 
+## Tested Devices
+These are the devices, and software versions this library has been tested with to confirm compatibilty/functionality.
+- **LG-D415** Android `4.4.4` (MIUI 7)
+- **Amazon Fire HD 8 Tablet** (Fire OS `5.3.6.4`)
+- **Pixel 3XL** (Android 9)
+- **Pixel 2** (Android 9)
+- **Pixel 1** (Android 9)
+- **2018 Macbook Pro** (OSX Mojave `10.14.3`)
+
+**Have you tested this library with a different device not listed here?** -- If so, **PLEASE** open a new issue, and let us know what model phone/device, and the software version so it can be added to this list!
+
 #### Known Endpoints
 Initialization enables a DNS responder for any `A` DNS record, that responds with the device's IP address.  Captive Portal also adds numerous HTTP endpoints for known Captive Portal device endpoints:
 - `/mobile/status.php` Android 8.0 (Samsung s9+)
@@ -111,7 +123,7 @@ Initialization enables a DNS responder for any `A` DNS record, that responds wit
 - `/hotspotdetect.html` iOS/OSX
 - `/library/test/success.html` iOS
 - `/success.txt` OSX
-- `/kindle-wifi/wifistub.html` Kindle
+- `/kindle-wifi/wifiredirect.html` Kindle (serves index file for this request to prevent "Insecure Redirect" warning)
 
 A root endpoint is also added, `/` to detect `CaptiveNetworkSupport` in the User-Agent of device, to redirect to captive portal.
 
