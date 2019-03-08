@@ -360,7 +360,7 @@ bool mgos_captive_portal_start(void){
     // To prevent warning saying "Insecure Connection" from redirect, we instead just immediately serve the captive portal file
     mgos_register_http_endpoint("/kindle-wifi/wifiredirect.html", serve_captive_portal_index_file, NULL);
     // Kindle before requesting with captive portal login window (maybe for detection?)
-    // mgos_register_http_endpoint("/kindle-wifi/wifistub.html", serve_redirect_ev_handler, NULL);
+    mgos_register_http_endpoint("/kindle-wifi/wifistub.html", serve_captive_portal_index_file, NULL);
 
     s_captive_portal_init = true;
 
