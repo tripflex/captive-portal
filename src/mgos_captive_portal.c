@@ -110,9 +110,16 @@ char *get_redirect_url(void){
 
 static void serve_captive_portal_file(const char *file, struct mg_connection *nc, struct http_message *msg){
 
-    if( ends_in_gz( file ) && accept_gzip_encoding(msg) ){
-        LOG(LL_INFO, ("-- Captive Portal Serving GZIP HTML file %s \n", file ));
-        mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *\r\nContent-Encoding: gzip"));
+    if( ends_in_gz( file ) ){
+
+        if( accept_gzip_encoding(msg) ){
+            LOG(LL_INFO, ("-- Captive Portal Serving GZIP HTML file %s \n", file ));
+            mg_http_serve_file(nc, msg, file, mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *\r\nContent-Encoding: gzip"));
+            return;
+        }
+
+        LOG(LL_INFO, ("-- Captive Portal Client DOES NOT SUPPORT GZIP -- Serving no_gzip.html File!\n" ));
+        mg_http_serve_file(nc, msg, "no_gzip.html", mg_mk_str("text/html"), mg_mk_str("Access-Control-Allow-Origin: *"));
         return;
     }
     
