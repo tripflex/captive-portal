@@ -7,6 +7,8 @@
   - [Author](#author)
   - [Why?](#why)
   - [Features](#features)
+  - [GZIP Support/Handling](#gzip-supporthandling)
+    - [GZIP Caveots](#gzip-caveots)
   - [Settings](#settings)
       - [`cportal.hostname` Setting](#cportalhostname-setting)
       - [`cportal.redirect_file` Setting](#cportalredirect_file-setting)
@@ -20,6 +22,7 @@
       - [Android `/generate_204` Handling](#android-generate_204-handling)
   - [Available Functions/Methods](#available-functionsmethods)
     - [C Functions](#c-functions)
+    - [Usage in mJS](#usage-in-mjs)
   - [Changelog](#changelog)
   - [License](#license)
 
@@ -40,6 +43,19 @@ You may be wondering why did I create my own, when Mongoose OS has a Captive Por
 - Support for GZIP files
 - Checks device Accepts header to make sure that it supports GZIP before sending/using GZIP files
 - Support for Samsung Android devices that do not follow Captive Portal 302 redirect standards
+
+## GZIP Support/Handling
+This library includes support for handling, and serving GZIP files from the device to the client.  It also checks the `Accept-Encoding` header sent from the client to verify that it supports GZIP before sending the file.  To enable GZIP all you need to do is specify the index or redirect file in settings, that ends in `.gz` and this library will automatically detect that, and handle GZIP accordingly.
+
+Any GZIP related assets (css, js, etc) will be automatically detected when they are requested (so you can just include them in your HTML file), and served as GZIP (if client supports it).
+
+### GZIP Caveots
+While using GZIP files does save a ton of space on the device -- there is a caveot to this. Some devices do not support GZIP, and if they do not, this library will not attempt to serve the GZIP file.  If the library detects that the index file is set to a GZIP file, and the client does not support GZIP,
+it will instead attempt to serve `no_gzip.html` file to the client.  
+
+You **MUST** manually add this file to your device under your `fs` directory it is not included with this library.  You can use this HTML file to notify/warn the user that the client they are using does not support GZIP and to use another device.
+
+**It is STRONGLY recommended** if you plan on using GZIP files, to add the `no_gzip.html` file to your project!
 
 ## Settings
 Check the `mos.yml` file for latest settings, all settings listed below are defaults
@@ -100,7 +116,7 @@ To use a specific branch of this library (as example, `dev`), you need to specif
 - [http-server](https://github.com/mongoose-os-libs/http-server)
 
 ## How it works
-When device boots up, if `cportal.enable` is set to `true` (default is `false`) captive portal is initialized. If `cportal.enable` is not set to `true` you must call `mgos_captive_portal_start` in C (mJS to be added later)
+When device boots up, if `cportal.enable` is set to `true` (default is `false`) captive portal is initialized. If `cportal.enable` is not set to `true` you must call `mgos_captive_portal_start` in C (see below for using in mjs)
 
 ## Tested Devices
 These are the devices, and software versions this library has been tested with to confirm compatibilty/functionality.
@@ -150,6 +166,13 @@ The reason I did not want to use the above approach was because this would resul
 ### C Functions
 ```C
 bool mgos_captive_portal_start(void)
+```
+
+### Usage in mJS
+To keep library size to a minimum, no mjs file is included with this library, but you can easily call it using the built in **ffi** for mjs, like this:
+```javascript
+let startCaptivePortal = ffi('bool mgos_captive_portal_start()');
+startCaptivePortal();
 ```
 
 ## Changelog
