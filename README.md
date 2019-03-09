@@ -10,6 +10,7 @@
   - [GZIP Support/Handling](#gzip-supporthandling)
     - [GZIP Caveots](#gzip-caveots)
   - [Settings](#settings)
+      - [`cportal.any` Setting](#cportalany-setting)
       - [`cportal.hostname` Setting](#cportalhostname-setting)
       - [`cportal.redirect_file` Setting](#cportalredirect_file-setting)
   - [Installation/Usage](#installationusage)
@@ -62,10 +63,15 @@ Check the `mos.yml` file for latest settings, all settings listed below are defa
 
 ```yaml
   - [ "cportal.enable", "b", false, {title: "Enable WiFi captive portal on device boot"}]
+  - [ "cportal.any", "b", false, {title: "Return index file for any non-hostname matching requests"}]
   - [ "cportal.hostname", "s", "setup.device.portal", {title: "Hostname to use for captive portal redirect"}]
   - [ "cportal.index", "s", "index.html", {title: "Filename of HTML file to use when serving the captive portal index file"}]
   - [ "cportal.redirect_file", "s", "", {title: "(optional) filename of HTML file to use for redirect to captive portal page (must include a meta refresh tag to do redirection)"}]
 ```
+#### `cportal.any` Setting
+Enable this setting (false by default) to serve the Captive Portal index file, for any **NON** captive portal hostname requests (any request to the device, that does not match the hostname in `cportal.hostname`)
+
+If you're having trouble with devices showing the login to network, this is a setting you can enable to see if this fixes the issue (you should however report this in an issue on this repo so I can look into it)
 
 #### `cportal.hostname` Setting
 By default this is set to `setup.device.portal` but you can change it to anything you want.  In my testing though, when testing with a `.local` domain, for some weird reason OSX (Mojave and El Captain) did not query the device for DNS to `.local` and would result in a "Could not connect" error.  This is why I have set the default as `.portal`, but you could use anything `setup.device.com`, etc, etc.
