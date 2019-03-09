@@ -14,6 +14,8 @@
       - [`cportal.hostname` Setting](#cportalhostname-setting)
       - [`cportal.redirect_file` Setting](#cportalredirect_file-setting)
   - [Installation/Usage](#installationusage)
+    - [Full Captive Portal Stack](#full-captive-portal-stack)
+    - [Only this library](#only-this-library)
     - [Use specific branch of library](#use-specific-branch-of-library)
   - [Required Libraries](#required-libraries)
   - [How it works](#how-it-works)
@@ -101,6 +103,18 @@ The `PORTAL_URL` is dynamically replaced with the value set in `cportal.hostname
 Make sure you include this if you use your own custom HTML redirect file, and make sure to replace `PORTAL_URL` with your captive portal hostname or URL you want to redirect the user to.  The value of `0` is how many seconds it waits before refreshing, with this set to `0` it does an immediate refresh.
 
 ## Installation/Usage
+
+### Full Captive Portal Stack
+If you want all of the features this library was built for, you should install the [Captive Portal WiFi Stack](https://github.com/tripflex/captive-portal-wifi-stack) library instead of just this one:
+
+Add this lib your `mos.yml` file under `libs:`
+
+```yaml
+  - origin: https://github.com/tripflex/captive-portal-wifi-stack
+```
+
+### Only this library
+
 Add this lib your `mos.yml` file under `libs:`
 
 ```yaml
