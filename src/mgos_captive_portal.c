@@ -249,11 +249,13 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
     struct mg_serve_http_opts opts;
     memcpy(&opts, &s_http_server_opts, sizeof(opts));
 
+    struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
+    // Check if URI is root directory
+    bool uriroot = strncmp(uri.p, "/ HTTP", 6) == 0;
+
     if ( is_captive_portal_hostname(msg) ){
         LOG(LL_INFO, ("Root Handler -- Host matches Captive Portal Host \n"));
-        struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
-        // Check if URI is root directory
-        bool uriroot = strncmp(uri.p, "/ HTTP", 6) == 0;
+
 
         // If gzip file requested -- set Content-Encoding
         if (gzip_file_requested(msg) && accept_gzip_encoding(msg)){
@@ -281,7 +283,7 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
 
         // Requested hostname does not match captive portal hostname, and user agent did not match either
         // If serve any enabled, serve portal index file regardless of requested hostname
-        if ( mgos_sys_config_get_cportal_any() ){
+        if ( mgos_sys_config_get_cportal_any() && uriroot ){
             LOG(LL_INFO, ("Captive Portal -- NOT Host -- Serve Any Enabled -- Serving Portal Index File!\n"));
             serve_captive_portal_file( s_portal_index_file, nc, msg );
             return;
