@@ -11,6 +11,7 @@
     - [GZIP Caveots](#gzip-caveots)
   - [Settings](#settings)
       - [`cportal.any` Setting](#cportalany-setting)
+      - [`cportal.ip_redirect` Setting](#cportalip_redirect-setting)
       - [`cportal.hostname` Setting](#cportalhostname-setting)
       - [`cportal.redirect_file` Setting](#cportalredirect_file-setting)
   - [Installation/Usage](#installationusage)
@@ -66,14 +67,22 @@ Check the `mos.yml` file for latest settings, all settings listed below are defa
 ```yaml
   - [ "cportal.enable", "b", false, {title: "Enable WiFi captive portal on device boot"}]
   - [ "cportal.any", "b", false, {title: "Return index file for any non-hostname matching requests"}]
+  - [ "cportal.ip_redirect", "b", false, {title: "Send 302 redirect to configured hostname when IP directly accessed"}]
   - [ "cportal.hostname", "s", "setup.device.portal", {title: "Hostname to use for captive portal redirect"}]
   - [ "cportal.index", "s", "index.html", {title: "Filename of HTML file to use when serving the captive portal index file"}]
   - [ "cportal.redirect_file", "s", "", {title: "(optional) filename of HTML file to use for redirect to captive portal page (must include a meta refresh tag to do redirection)"}]
 ```
 #### `cportal.any` Setting
-Enable this setting (false by default) to serve the Captive Portal index file, for any **NON** captive portal hostname requests (any request to the device, that does not match the hostname in `cportal.hostname`)
+Enable this setting (false by default) to serve the Captive Portal index file, for any **NON** captive portal hostname requests (any request to the device, that does not match the hostname in `cportal.hostname`).
+
+This will only serve captive portal file for any root uri requests -- meaning if request is `http://something.com/` it will serve the index file.  If the request is `http://something.com/something-else` it will not serve the index file.
 
 If you're having trouble with devices showing the login to network, this is a setting you can enable to see if this fixes the issue (you should however report this in an issue on this repo so I can look into it)
+
+#### `cportal.ip_redirect` Setting
+Enable this setting (false by default) to send a 302 redirect to the configured hostname ( `cportal.hostname` ) when a device or browser attempts to access the device using the IP address instead of a hostname.  For example, if someone connects to wifi and uses browser to access `http://192.168.4.1/` it will send a 302 redirect to `http://setup.device.portal` (as configured in `cportal.hostname`)
+
+This was added for supporting **stupid** Samsung Devices that do not prompt the captive portal "Login to Network" so when the user clicks on the wifi network in settings, and clicks on "Manage Router" it will open a browser for the captive portal hostname, instead of the IP address.
 
 #### `cportal.hostname` Setting
 By default this is set to `setup.device.portal` but you can change it to anything you want.  In my testing though, when testing with a `.local` domain, for some weird reason OSX (Mojave and El Captain) did not query the device for DNS to `.local` and would result in a "Could not connect" error.  This is why I have set the default as `.portal`, but you could use anything `setup.device.com`, etc, etc.
@@ -151,7 +160,7 @@ These are the devices, and software versions this library has been tested with t
 
 #### Known Endpoints
 Initialization enables a DNS responder for any `A` DNS record, that responds with the device's IP address.  Captive Portal also adds numerous HTTP endpoints for known Captive Portal device endpoints:
-- `/mobile/status.php` Android 8.0 (Samsung s9+)
+- `/mobile/status.php` Android 8.0
 - `/generate_204` Android
 - `/gen_204` Android
 - `/ncsi.txt` Windows
@@ -170,12 +179,16 @@ If on a mobile device, the user should be prompted to "Login to Wifi Network", o
 The root endpoint is also used, to detect the value in the `Host` header, and if it matches the `cportal.hostname` value, we assume the access is meant for the captive portal.  This allows you to serve HTML files via your device, without captive portal taking over the `index.html` file (but you must specify the custom file to use in `cportal.index`)
 
 #### Samsung Device Caveots
-Samsung devices seem to be one of the only ones with captive portal issues, which I determined was due to those devices not following the standard of when a 302 redirect is returned, that is means there's a captive portal.
+
+**Short and Sweet -- Samsung SUCKS**
+Samsung devices seem to be one of the only ones with captive portal issues, which I determined was due to those devices not following the standard of when a 302 redirect is returned, that is means there's a captive portal. This only happens on Samsung's modified version of Android.
 
 See [the issue from my original Wifi Captive Portal library](https://github.com/tripflex/wifi-captive-portal/issues/7) for more details
 
-The workaround for this is described below in how this library handles the `generate_204` endpoint for Android devices
+The workaround for this is described below in how this library handles the `generate_204` endpoint for Android devices, but this doesn't work for all Samsung devices, and it seems to be a clear issue with only Samsung versions of Android that modified how Captive Portal is handled.
 
+**Basically** what this means, is if a user's device does not prompt to login to the network, they have to click on the wifi network in settings, and then click on Manage Router. Yes it's annoying but I can't find any way to resolve this, and Samsung has not provided any help with this.  If you know how to get this working or fix this problem, **PLEASE** open an issue and let me know!
+ 
 #### Android `/generate_204` Handling
 As mentioned above -- Samsung devices suck.  The workaround for this was instead of returning a `302` redirect, to return a `200` response, with content in the response.  Most threads or questions you find online regarding this say to just return the captive portal splash page ... while this would work, this was not the approach I wanted to take.
 
@@ -197,7 +210,12 @@ startCaptivePortal();
 
 ## Changelog
 
-**1.0.0** TBD - Initial release
+**1.1.0** June 6, 2019
+
+- Fixed `cportal.any` setting serving index file for any non-root uri requests (meaning it would not load css/js/etc)
+
+**1.0.0** March 8, 2019
+- Initial release
 
 ## License
 Apache 2.0

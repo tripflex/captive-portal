@@ -92,6 +92,27 @@ static bool is_captive_portal_hostname(struct http_message *msg){
     return matches;
 }
 
+static bool ends_with(const char *str, const char *suffix){
+    if (!str || !suffix) return false;
+    size_t lenstr = strlen(str);
+    size_t lensuffix = strlen(suffix);
+    if (lensuffix > lenstr) return false;
+    return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
+}
+
+static bool is_device_ip_hostname(struct http_message *msg){
+    struct mg_str *hhdr = mg_get_http_header(msg, "Host");
+    bool matches = hhdr != NULL && strstr(hhdr->p, s_ap_ip) != NULL;
+    if( ! matches ){
+        LOG(LL_DEBUG, ("Root Handler -- HostName Does NOT Match Device IP Actual: %s ", hhdr->p ));
+    }
+    return matches;
+}
+
+static bool is_css_or_js_file( const char *string ){
+    return ends_with( string, '.css' ) || ends_with( string, '.js' ) || ends_with( string, '.css.gz' ) || ends_with( string, '.js.gz' );
+}
+
 static bool ends_in_gz( const char *string ){
 
     if(strlen(string) > 3 && !strcmp(string + strlen(string) - 3, ".gz")){
