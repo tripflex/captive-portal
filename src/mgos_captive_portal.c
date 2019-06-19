@@ -265,7 +265,6 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
     if ( is_captive_portal_hostname(msg) ){
         LOG(LL_DEBUG, ("Root Handler -- Host matches Captive Portal Host \n"));
 
-
         // If gzip file requested -- set Content-Encoding
         if (gzip_file_requested(msg) && accept_gzip_encoding(msg)){
             LOG(LL_DEBUG, ("Root Handler -- gzip Asset Requested -- Adding Content-Encoding Header \n"));
