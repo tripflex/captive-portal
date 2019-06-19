@@ -210,8 +210,8 @@ startCaptivePortal();
 
 ## Changelog
 
-**1.1.0** June 6, 2019
-
+**1.1.0** June 19, 2019
+- NEW added `cportal.ip_redirect` setting for ip redirect to hostname
 - Fixed `cportal.any` setting serving index file for any non-root uri requests (meaning it would not load css/js/etc)
 
 **1.0.0** March 8, 2019
