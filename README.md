@@ -7,6 +7,7 @@
   - [Author](#author)
   - [Why?](#why)
   - [Features](#features)
+  - [DNS-SD Library Caveots](#dns-sd-library-caveots)
   - [GZIP Support/Handling](#gzip-supporthandling)
     - [GZIP Caveots](#gzip-caveots)
   - [Settings](#settings)
@@ -47,6 +48,13 @@ You may be wondering why did I create my own, when Mongoose OS has a Captive Por
 - Support for GZIP files
 - Checks device Accepts header to make sure that it supports GZIP before sending/using GZIP files
 - Support for Samsung Android devices that do not follow Captive Portal 302 redirect standards
+
+## DNS-SD Library Caveots
+If you want to use the DNS-SD library in combination with this library, they both CAN NOT be enabled at the same time!  I'm digging into what is required to allow them to work at the same time, but right now, since this library requires setting up a DNS responder, it will not work with DNS-SD enabled at the same time.
+
+The easiest solution is to just make sure that when you set `cportal.enable` to **true** -- you must also set `dns_sd.enable` to **false**
+
+If `cportal.enable` is false, you can enable `dns_sd.enable` as the DNS responder will be disabled in this library.
 
 ## GZIP Support/Handling
 This library includes support for handling, and serving GZIP files from the device to the client.  It also checks the `Accept-Encoding` header sent from the client to verify that it supports GZIP before sending the file.  To enable GZIP all you need to do is specify the index or redirect file in settings, that ends in `.gz` and this library will automatically detect that, and handle GZIP accordingly.

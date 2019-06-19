@@ -92,14 +92,6 @@ static bool is_captive_portal_hostname(struct http_message *msg){
     return matches;
 }
 
-static bool ends_with(const char *str, const char *suffix){
-    if (!str || !suffix) return false;
-    size_t lenstr = strlen(str);
-    size_t lensuffix = strlen(suffix);
-    if (lensuffix > lenstr) return false;
-    return strncmp(str + lenstr - lensuffix, suffix, lensuffix) == 0;
-}
-
 static bool is_device_ip_hostname(struct http_message *msg){
     struct mg_str *hhdr = mg_get_http_header(msg, "Host");
     bool matches = hhdr != NULL && strstr(hhdr->p, s_ap_ip) != NULL;
@@ -107,10 +99,6 @@ static bool is_device_ip_hostname(struct http_message *msg){
         LOG(LL_DEBUG, ("Root Handler -- HostName Does NOT Match Device IP Actual: %s ", hhdr->p ));
     }
     return matches;
-}
-
-static bool is_css_or_js_file( const char *string ){
-    return ends_with( string, '.css' ) || ends_with( string, '.js' ) || ends_with( string, '.css.gz' ) || ends_with( string, '.js.gz' );
 }
 
 static bool ends_in_gz( const char *string ){
@@ -270,11 +258,13 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
     struct mg_serve_http_opts opts;
     memcpy(&opts, &s_http_server_opts, sizeof(opts));
 
+    struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
+    // Check if URI is root directory
+    bool uriroot = strncmp(uri.p, "/ HTTP", 6) == 0;
+
     if ( is_captive_portal_hostname(msg) ){
         LOG(LL_DEBUG, ("Root Handler -- Host matches Captive Portal Host \n"));
-        struct mg_str uri = mg_mk_str_n(msg->uri.p, msg->uri.len);
-        // Check if URI is root directory
-        bool uriroot = strncmp(uri.p, "/ HTTP", 6) == 0;
+
 
         // If gzip file requested -- set Content-Encoding
         if (gzip_file_requested(msg) && accept_gzip_encoding(msg)){
@@ -300,9 +290,16 @@ static void root_handler(struct mg_connection *nc, int ev, void *p, void *user_d
             return;
         }
 
+        // Check if direct access to IP address
+        if( mgos_sys_config_get_cportal_ip_redirect() && is_device_ip_hostname(msg) && uriroot ){
+            LOG(LL_DEBUG, ("Root Handler -- Direct IP accessed -- Sending Redirect!\n"));
+            redirect_ev_handler(nc, ev, p, user_data);
+            return;
+        }
+
         // Requested hostname does not match captive portal hostname, and user agent did not match either
         // If serve any enabled, serve portal index file regardless of requested hostname
-        if ( mgos_sys_config_get_cportal_any() ){
+        if ( mgos_sys_config_get_cportal_any() && uriroot ){
             LOG(LL_DEBUG, ("Captive Portal -- NOT Host -- Serve Any Enabled -- Serving Portal Index File!\n"));
             serve_captive_portal_file( s_portal_index_file, nc, msg );
             return;
