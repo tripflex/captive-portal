@@ -16,6 +16,7 @@ includes:
 config_schema:
   - [ "cportal", "o", {title: "Captive Portal configurations"}]
   - [ "cportal.any", "b", false, {title: "Return index file for any non-hostname matching requests"}]
+  - [ "cportal.ip_redirect", "b", false, {title: "Send 302 redirect to configured hostname when IP directly accessed"}]
   - [ "cportal.enable", "b", false, {title: "Enable WiFi captive portal on device boot"}]
   - [ "cportal.hostname", "s", "setup.device.portal", {title: "Hostname to use for captive portal redirect"}]
   - [ "cportal.index", "s", "index.html", {title: "Filename of HTML file to use when serving the captive portal index file"}]
