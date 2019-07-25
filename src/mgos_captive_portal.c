@@ -43,16 +43,16 @@ static void http_msg_print(const struct http_message *msg){
     LOG(LL_DEBUG, ("         uri: \"%.*s\"", msg->uri.len, msg->uri.p));
 }
 
-static bool x_requested_with_android( struct http_message *msg ){
+// static bool x_requested_with_android( struct http_message *msg ){
     
-    struct mg_str *hdrval = mg_get_http_header(msg, "X-Requested-With");
+//     struct mg_str *hdrval = mg_get_http_header(msg, "X-Requested-With");
 
-    if (hdrval != NULL && strstr(hdrval->p, "com.android.captiveportallogin") != NULL ){
-        return true;
-    }
+//     if (hdrval != NULL && strstr(hdrval->p, "com.android.captiveportallogin") != NULL ){
+//         return true;
+//     }
 
-    return false;
-}
+//     return false;
+// }
 
 static bool accept_gzip_encoding( struct http_message *msg ){
     
@@ -147,27 +147,27 @@ static void serve_captive_portal_index_file(struct mg_connection *nc, int ev, vo
     (void)user_data;
 }
 
-static void send_redirect_html_generated2(struct mg_connection *nc, int status_code,
-                           const struct mg_str location,
-                           const struct mg_str extra_headers) {
-  char bbody[100], *pbody = bbody;
-  int bl = mg_asprintf(&pbody, sizeof(bbody),
-                       "<html><head><title>Redirecting to Captive Portal</title><meta http-equiv='refresh' content='0; url=%.*s'></head><body><p>Click <a href='%.*s'>here</a> to login.</p></body></html>\r\n",
-                       (int) location.len, location.p, (int) location.len, location.p );
-  char bhead[150], *phead = bhead;
-  mg_asprintf(&phead, sizeof(bhead),
-              "Location: %.*s\r\n"
-              "Content-Type: text/html\r\n"
-              "Content-Length: %d\r\n"
-              "Cache-Control: no-cache\r\n"
-              "%.*s%s",
-              (int) location.len, location.p, bl, (int) extra_headers.len,
-              extra_headers.p, (extra_headers.len > 0 ? "\r\n" : ""));
-  mg_send_response_line(nc, status_code, phead);
-  if (phead != bhead) free(phead);
-  mg_send(nc, pbody, bl);
-  if (pbody != bbody) free(pbody);
-}
+// static void send_redirect_html_generated2(struct mg_connection *nc, int status_code,
+//                            const struct mg_str location,
+//                            const struct mg_str extra_headers) {
+//   char bbody[100], *pbody = bbody;
+//   int bl = mg_asprintf(&pbody, sizeof(bbody),
+//                        "<html><head><title>Redirecting to Captive Portal</title><meta http-equiv='refresh' content='0; url=%.*s'></head><body><p>Click <a href='%.*s'>here</a> to login.</p></body></html>\r\n",
+//                        (int) location.len, location.p, (int) location.len, location.p );
+//   char bhead[150], *phead = bhead;
+//   mg_asprintf(&phead, sizeof(bhead),
+//               "Location: %.*s\r\n"
+//               "Content-Type: text/html\r\n"
+//               "Content-Length: %d\r\n"
+//               "Cache-Control: no-cache\r\n"
+//               "%.*s%s",
+//               (int) location.len, location.p, bl, (int) extra_headers.len,
+//               extra_headers.p, (extra_headers.len > 0 ? "\r\n" : ""));
+//   mg_send_response_line(nc, status_code, phead);
+//   if (phead != bhead) free(phead);
+//   mg_send(nc, pbody, bl);
+//   if (pbody != bbody) free(pbody);
+// }
 
 static void send_redirect_html_generated(struct mg_connection *nc, int status_code, const struct mg_str location ) {
   char bbody[100], *pbody = bbody;
