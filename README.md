@@ -217,6 +217,8 @@ startCaptivePortal();
 ```
 
 ## Changelog
+**1.1.1** March 1, 2022
+- Prevent core panic with bind DNS @props sactre
 
 **1.1.0** June 19, 2019
 - NEW added `cportal.ip_redirect` setting for ip redirect to hostname
