@@ -1,7 +1,7 @@
 author: Myles McNamara <myles@smyl.es>
 type: lib
 description: DNS responder and HTTP file serve handling for Captive Portals
-version: 1.0.0
+version: 1.1.1
 # platforms: [ cc3200, cc3220, esp32, esp8266 ]
 
 sources:
