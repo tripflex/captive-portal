@@ -340,12 +340,13 @@ bool mgos_captive_portal_start(void){
 
     // Bind DNS for Captive Portal
     struct mg_connection *dns_c = mg_bind(mgos_get_mgr(), s_listening_addr, dns_ev_handler, 0);
-    mg_set_protocol_dns(dns_c);
 
     if (dns_c == NULL){
-        LOG(LL_ERROR, ("Failed to initialize DNS listener"));
+        // wifi.ap.hostname value should be empty
+        LOG(LL_ERROR, ("Failed to initialize DNS listener, The port may already be in use."));
         return false;
     } else {
+        mg_set_protocol_dns(dns_c);
         LOG(LL_DEBUG, ("Captive Portal DNS Listening on %s", s_listening_addr));
     }
 
